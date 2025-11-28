@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Eclipse - Theme Adaptive Image Generator</title>
+    <!-- Cropper.js CSS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --text-color: #e0e0e0;
+            --accent-color: #bb86fc;
+            --card-bg: #1e1e1e;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        h1 {
+            color: var(--accent-color);
+            margin-bottom: 10px;
+        }
+
+        .container {
+            max-width: 1400px;
+            /* Wider container */
+            width: 100%;
+            display: flex;
+            /* Two-column layout */
+            gap: 30px;
+            align-items: flex-start;
+            /* Required for sticky */
+            margin-bottom: 40px;
+        }
+
+        /* Left Column: Input & Crop */
+        .input-column {
+            flex: 1.5;
+            /* Takes more space */
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        /* Right Column: Previews */
+        .preview-column {
+            flex: 1;
+            position: sticky;
+            top: 20px;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .controls {
+            padding: 20px;
+            background: var(--card-bg);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            display: flex;
+            gap: 20px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        input[type="file"] {
+            padding: 10px;
+            background: #333;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+        }
+
+        button {
+            background: var(--accent-color);
+            color: #000;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        .crop-container {
+            max-height: 600px;
+            /* Taller crop area */
+            background: #000;
+            display: none;
+            /* Hidden until image uploaded */
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Limit image max height for cropper */
+        #image-to-crop {
+            max-width: 100%;
+            display: block;
+        }
+
+        .preview-area {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .preview-card {
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .light-mode {
+            background-color: #ffffff;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .dim-mode {
+            background-color: #15202b;
+            color: #ccc;
+            border: 1px solid #333;
+        }
+
+        .dark-mode {
+            background-color: #000000;
+            color: #ccc;
+            border: 1px solid #333;
+        }
+
+        canvas {
+            max-width: 100%;
+            height: auto;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        label {
+            font-size: 0.9em;
+            color: #aaa;
+        }
+
+        footer {
+            margin-top: auto;
+            padding: 20px;
+            text-align: center;
+            color: #777;
+            font-size: 0.9em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        footer a {
+            color: var(--accent-color);
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        footer svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 900px) {
+            .container {
+                flex-direction: column;
+            }
+
+            .preview-column {
+                position: static;
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Eclipse 🌗</h1>
+    <p>Theme-Adaptive Image Generator</p>
+
+    <div class="container">
+        <!-- Left Column: Input & Crop -->
+        <div class="input-column">
+            <div class="controls">
+                <div class="slider-group">
+                    <label for="upload">Upload Image</label>
+                    <input type="file" id="upload" accept="image/*">
+                </div>
+                <div class="slider-group">
+                    <label for="output-size">Output Size / Crop Ratio</label>
+                    <select id="output-size" style="padding: 5px; background: #333; color: white; border-radius: 4px;">
+                        <option value="original">Free / Original</option>
+                        <option value="header">Twitter Header (1500x500)</option>
+                        <option value="pfp">Twitter Profile (400x400)</option>
+                    </select>
+                </div>
+
+                <div class="slider-group">
+                    <label for="opacity-min">Min Opacity (Highlights) <span id="val-min">20</span>%</label>
+                    <input type="range" id="opacity-min" min="0" max="100" value="20">
+                </div>
+                <div class="slider-group">
+                    <label for="opacity-max">Max Opacity (Shadows) <span id="val-max">100</span>%</label>
+                    <input type="range" id="opacity-max" min="0" max="100" value="100">
+                </div>
+                <div class="slider-group">
+                    <label for="contrast">Contrast <span id="val-contrast">1.0</span></label>
+                    <input type="range" id="contrast" min="0.5" max="3.0" step="0.1" value="1.0">
+                </div>
+                <div class="slider-group">
+                    <label>
+                        <input type="checkbox" id="preserve-color"> Preserve Color
+                    </label>
+                </div>
+                <div class="slider-group">
+                    <label for="glow-strength">Magic Glow (Dark Mode) <span id="val-glow">0</span></label>
+                    <input type="range" id="glow-strength" min="0" max="50" value="0">
+                </div>
+                <div class="slider-group">
+                    <label for="invert-strength">Invert Colors <span id="val-invert">0</span>%</label>
+                    <input type="range" id="invert-strength" min="0" max="100" value="0">
+                </div>
+                <button id="process-btn">Process Image</button>
+                <button id="download-btn" disabled>Download PNG</button>
+            </div>
+
+            <!-- Crop Area -->
+            <div class="crop-container" id="crop-container">
+                <img id="image-to-crop" src="" alt="Upload an image to crop">
+            </div>
+        </div>
+
+        <!-- Right Column: Sticky Previews -->
+        <div class="preview-column">
+            <h3 style="margin-top: 0; color: var(--accent-color);">Previews</h3>
+            <div class="preview-area">
+                <div class="preview-card light-mode">
+                    <h4>Light Mode</h4>
+                    <canvas id="canvas-light"></canvas>
+                </div>
+                <div class="preview-card dim-mode">
+                    <h4>Dim Mode</h4>
+                    <canvas id="canvas-dim"></canvas>
+                </div>
+                <div class="preview-card dark-mode">
+                    <h4>Dark Mode</h4>
+                    <canvas id="canvas-dark"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        Built by
+        <a href="https://x.com/SchoolRanker" target="_blank">
+            SchoolRanker Africa
+            <!-- X Icon -->
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <g>
+                    <path
+                        d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z">
+                    </path>
+                </g>
+            </svg>
+        </a>
+    </footer>
+
+    <!-- Cropper.js JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script>
+        const uploadInput = document.getElementById('upload');
+        const processBtn = document.getElementById('process-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        const outputSizeSelect = document.getElementById('output-size');
+        const opacityMinSlider = document.getElementById('opacity-min');
+        const opacityMaxSlider = document.getElementById('opacity-max');
+        const contrastSlider = document.getElementById('contrast');
+        const preserveColorCheckbox = document.getElementById('preserve-color');
+        const glowSlider = document.getElementById('glow-strength');
+        const invertSlider = document.getElementById('invert-strength');
+        const cropContainer = document.getElementById('crop-container');
+        const imageToCrop = document.getElementById('image-to-crop');
+
+        const valMin = document.getElementById('val-min');
+        const valMax = document.getElementById('val-max');
+        const valContrast = document.getElementById('val-contrast');
+        const valGlow = document.getElementById('val-glow');
+        const valInvert = document.getElementById('val-invert');
+
+        const canvasLight = document.getElementById('canvas-light');
+        const ctxLight = canvasLight.getContext('2d');
+        const canvasDark = document.getElementById('canvas-dark');
+        const ctxDark = canvasDark.getContext('2d');
+        const canvasDim = document.getElementById('canvas-dim');
+        const ctxDim = canvasDim.getContext('2d');
+
+        let cropper = null;
+        let cachedImageData = null;
+
+        // Auto-process on slider change if image exists (and is processed)
+        // Optimization: We cache the cropped data so we don't re-crop on every slider move.
+        const triggerProcess = () => { if (cropper) processImage(); };
+
+        // Use 'input' for real-time updates (smooth dragging)
+        opacityMinSlider.addEventListener('input', (e) => { valMin.textContent = e.target.value; triggerProcess(); });
+        opacityMaxSlider.addEventListener('input', (e) => { valMax.textContent = e.target.value; triggerProcess(); });
+        contrastSlider.addEventListener('input', (e) => { valContrast.textContent = e.target.value; triggerProcess(); });
+        glowSlider.addEventListener('input', (e) => { valGlow.textContent = e.target.value; triggerProcess(); });
+        invertSlider.addEventListener('input', (e) => { valInvert.textContent = e.target.value; triggerProcess(); });
+
+        preserveColorCheckbox.addEventListener('change', triggerProcess);
+
+        // Update Cropper Aspect Ratio when selection changes
+        outputSizeSelect.addEventListener('change', () => {
+            if (!cropper) return;
+
+            const sizeMode = outputSizeSelect.value;
+            if (sizeMode === 'header') {
+                cropper.setAspectRatio(1500 / 500);
+            } else if (sizeMode === 'pfp') {
+                cropper.setAspectRatio(1); // 1:1
+            } else {
+                cropper.setAspectRatio(NaN); // Free
+            }
+        });
+
+        uploadInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                // Reset
+                if (cropper) {
+                    cropper.destroy();
+                }
+                imageToCrop.src = event.target.result;
+                cropContainer.style.display = 'block';
+
+                // Initialize Cropper
+                cropper = new Cropper(imageToCrop, {
+                    viewMode: 1, // Restrict crop box to not exceed canvas
+                    autoCropArea: 1, // Start with full image selected
+                    responsive: true,
+                    ready() {
+                        updateCroppedData(); // Initial process
+                    },
+                    cropend() {
+                        updateCroppedData(); // Update cache on crop end
+                    }
+                });
+
+                // Trigger aspect ratio set based on current dropdown
+                outputSizeSelect.dispatchEvent(new Event('change'));
+            };
+            reader.readAsDataURL(file);
+        });
+
+        processBtn.addEventListener('click', () => {
+            if (cropper) processImage();
+            else alert('Please upload an image first.');
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'eclipse-adaptive.png';
+            link.href = canvasLight.toDataURL('image/png');
+            link.click();
+        });
+
+        function updateCroppedData() {
+            if (!cropper) return;
+
+            // Get cropped canvas
+            const sizeMode = outputSizeSelect.value;
+            let options = {};
+
+            if (sizeMode === 'header') {
+                options = { width: 1500, height: 500 };
+            } else if (sizeMode === 'pfp') {
+                options = { width: 400, height: 400 };
+            }
+
+            const croppedCanvas = cropper.getCroppedCanvas(options);
+            if (!croppedCanvas) return;
+
+            // Set display canvas dimensions
+            canvasLight.width = croppedCanvas.width;
+            canvasLight.height = croppedCanvas.height;
+            canvasDark.width = croppedCanvas.width;
+            canvasDark.height = croppedCanvas.height;
+            canvasDim.width = croppedCanvas.width;
+            canvasDim.height = croppedCanvas.height;
+
+            // Cache the data
+            const ctx = croppedCanvas.getContext('2d');
+            cachedImageData = ctx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
+
+            processImage();
+        }
+
+        function processImage() {
+            if (!cachedImageData) return;
+
+            // Create a copy of the cached data to work on
+            const data = new Uint8ClampedArray(cachedImageData.data);
+            const newImageData = new ImageData(data, cachedImageData.width, cachedImageData.height);
+
+            const minOp = parseInt(opacityMinSlider.value) / 100;
+            const maxOp = parseInt(opacityMaxSlider.value) / 100;
+            const contrast = parseFloat(contrastSlider.value);
+            const preserveColor = preserveColorCheckbox.checked;
+            const invertStrength = parseInt(invertSlider.value) / 100;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                const a = data[i + 3];
+
+                if (a === 0) continue;
+
+                // 1. Convert to Grayscale (Luminance)
+                let L = 0.299 * r + 0.587 * g + 0.114 * b;
+
+                // Apply Contrast
+                L = (L - 128) * contrast + 128;
+                if (L < 0) L = 0;
+                if (L > 255) L = 255;
+
+                // Apply Inversion to Luminance
+                if (invertStrength > 0) {
+                    L = L * (1 - invertStrength) + (255 - L) * invertStrength;
+                }
+
+                // 2. Set RGB
+                if (!preserveColor) {
+                    data[i] = L;
+                    data[i + 1] = L;
+                    data[i + 2] = L;
+                } else {
+                    // If preserving color, invert RGB if needed
+                    if (invertStrength > 0) {
+                        data[i] = data[i] * (1 - invertStrength) + (255 - data[i]) * invertStrength;
+                        data[i + 1] = data[i + 1] * (1 - invertStrength) + (255 - data[i + 1]) * invertStrength;
+                        data[i + 2] = data[i + 2] * (1 - invertStrength) + (255 - data[i + 2]) * invertStrength;
+                    }
+                }
+
+                // 3. Calculate Adaptive Opacity
+                const normalizedL = L / 255;
+                const alphaFactor = maxOp - (maxOp - minOp) * normalizedL;
+
+                data[i + 3] = a * alphaFactor;
+            }
+
+            // 4. Apply Magic Glow (if enabled)
+            const glowStrength = parseInt(glowSlider.value);
+
+            if (glowStrength > 0) {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvasLight.width;
+                tempCanvas.height = canvasLight.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.putImageData(newImageData, 0, 0);
+
+                ctxLight.clearRect(0, 0, canvasLight.width, canvasLight.height);
+                ctxDark.clearRect(0, 0, canvasDark.width, canvasDark.height);
+                ctxDim.clearRect(0, 0, canvasDim.width, canvasDim.height);
+
+                ctxLight.shadowColor = 'rgba(255, 255, 255, 0.8)';
+                ctxLight.shadowBlur = glowStrength;
+                ctxLight.shadowOffsetX = 0;
+                ctxLight.shadowOffsetY = 0;
+
+                ctxLight.drawImage(tempCanvas, 0, 0);
+
+                ctxLight.shadowColor = 'transparent';
+                ctxLight.drawImage(tempCanvas, 0, 0);
+
+                ctxDark.drawImage(canvasLight, 0, 0);
+                ctxDim.drawImage(canvasLight, 0, 0);
+            } else {
+                ctxLight.putImageData(newImageData, 0, 0);
+                ctxDark.putImageData(newImageData, 0, 0);
+                ctxDim.putImageData(newImageData, 0, 0);
+            }
+
+            downloadBtn.disabled = false;
+        }
+    </script>
+</body>
+
+</html>
