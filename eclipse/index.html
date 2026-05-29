@@ -536,6 +536,51 @@
             outline-offset: 2px;
         }
 
+        /* Background Removal controls */
+        .bg-remove-section {
+            margin-top: 14px;
+            padding: 14px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .bg-remove-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .bg-remove-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 0.75em;
+            margin-left: 4px;
+            font-weight: 600;
+        }
+
+        .bg-remove-badge.active {
+            background: rgba(76, 175, 80, 0.2);
+            border: 1px solid #4caf50;
+            color: #81c784;
+        }
+
+        .bg-remove-badge.low {
+            background: rgba(255, 193, 7, 0.15);
+            border: 1px solid #ffc107;
+            color: #ffcc80;
+        }
+
+        .bg-remove-tuning {
+            margin-top: 12px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 900px) {
             .container {
@@ -575,6 +620,29 @@
                     </div>
                 </div>
                 <div class="status-chips" id="status-chips" aria-live="polite" aria-atomic="true"></div>
+
+                <!-- Background Removal Mode -->
+                <div class="bg-remove-section">
+                    <div class="bg-remove-header">
+                        <label for="bg-remove-mode" style="color:#aaa;font-size:0.9em;">Background Removal:</label>
+                        <select id="bg-remove-mode" class="preset-select">
+                            <option value="off" selected>Off</option>
+                            <option value="quick">Quick</option>
+                            <option value="accurate">Accurate</option>
+                        </select>
+                        <span class="bg-remove-badge" id="bg-remove-badge" style="display:none;" aria-live="polite"></span>
+                    </div>
+                    <div class="bg-remove-tuning" id="bg-remove-tuning" style="display:none;">
+                        <div class="slider-group">
+                            <label for="bg-threshold">Threshold <span id="val-threshold">20</span></label>
+                            <input type="range" id="bg-threshold" min="1" max="100" value="20">
+                        </div>
+                        <div class="slider-group">
+                            <label for="bg-feather">Feather <span id="val-feather">30</span></label>
+                            <input type="range" id="bg-feather" min="0" max="100" value="30">
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Step 2: Destination -->
@@ -780,6 +848,17 @@
         let currentDestination = 'pfp';
         let lastUploadedFile = null;
 
+        // Background removal refs
+        const bgRemoveMode = document.getElementById('bg-remove-mode');
+        const bgRemoveTuning = document.getElementById('bg-remove-tuning');
+        const bgRemoveBadge = document.getElementById('bg-remove-badge');
+        const bgThreshold = document.getElementById('bg-threshold');
+        const bgFeather = document.getElementById('bg-feather');
+        const valThreshold = document.getElementById('val-threshold');
+        const valFeather = document.getElementById('val-feather');
+
+        const ENABLE_ACCURATE_BG_REMOVE = false;
+
         // Auto-process on slider change if image exists (and is processed)
         // Optimization: We cache the cropped data so we don't re-crop on every slider move.
         const triggerProcess = () => { if (cropper) processImage(); };
@@ -828,6 +907,39 @@
         invertSlider.addEventListener('input', (e) => { valInvert.textContent = e.target.value; markCustom(); triggerProcess(); });
 
         preserveColorCheckbox.addEventListener('change', () => { markCustom(); triggerProcess(); });
+
+        // Background removal event handlers
+        bgRemoveMode.addEventListener('change', function () {
+            var mode = bgRemoveMode.value;
+            if (mode === 'accurate') {
+                if (!ENABLE_ACCURATE_BG_REMOVE) {
+                    bgRemoveBadge.style.display = 'inline-flex';
+                    bgRemoveBadge.className = 'bg-remove-badge low';
+                    bgRemoveBadge.textContent = 'Accurate unavailable in this build';
+                    bgRemoveTuning.style.display = 'none';
+                    triggerProcess();
+                    return;
+                }
+                bgRemoveTuning.style.display = 'flex';
+            } else if (mode === 'quick') {
+                bgRemoveTuning.style.display = 'flex';
+                bgRemoveBadge.style.display = 'none';
+            } else {
+                bgRemoveTuning.style.display = 'none';
+                bgRemoveBadge.style.display = 'none';
+            }
+            triggerProcess();
+        });
+
+        bgThreshold.addEventListener('input', function () {
+            valThreshold.textContent = this.value;
+            triggerProcess();
+        });
+
+        bgFeather.addEventListener('input', function () {
+            valFeather.textContent = this.value;
+            triggerProcess();
+        });
 
         // Destination cards logic
         function setDestinationValue(value) {
@@ -1008,6 +1120,180 @@
             return Math.min(100, Math.round((stdDev / 128) * 100));
         }
 
+        function removeBackgroundQuick(imageData, threshold, feather) {
+            const pixels = imageData.data;
+            const w = imageData.width;
+            const h = imageData.height;
+            const patchSize = Math.min(20, Math.floor(w / 8), Math.floor(h / 8));
+            if (patchSize < 1) return { confidence: 0 };
+
+            const corners = [
+                { x: 0, y: 0 },
+                { x: w - patchSize, y: 0 },
+                { x: 0, y: h - patchSize },
+                { x: w - patchSize, y: h - patchSize }
+            ];
+
+            var samplesR = [], samplesG = [], samplesB = [];
+            for (var ci = 0; ci < corners.length; ci++) {
+                var cx = corners[ci].x, cy = corners[ci].y;
+                for (var dy = 0; dy < patchSize; dy++) {
+                    for (var dx = 0; dx < patchSize; dx++) {
+                        var idx = ((cy + dy) * w + (cx + dx)) * 4;
+                        if (pixels[idx + 3] > 0) {
+                            samplesR.push(pixels[idx]);
+                            samplesG.push(pixels[idx + 1]);
+                            samplesB.push(pixels[idx + 2]);
+                        }
+                    }
+                }
+            }
+
+            if (samplesR.length === 0) return { confidence: 0 };
+
+            samplesR.sort(function (a, b) { return a - b; });
+            samplesG.sort(function (a, b) { return a - b; });
+            samplesB.sort(function (a, b) { return a - b; });
+            var mid = Math.floor(samplesR.length / 2);
+            var bgR = samplesR[mid];
+            var bgG = samplesG[mid];
+            var bgB = samplesB[mid];
+
+            // Corner uniformity -> confidence
+            var meanR = 0, meanG = 0, meanB = 0;
+            for (var si = 0; si < samplesR.length; si++) {
+                meanR += samplesR[si];
+                meanG += samplesG[si];
+                meanB += samplesB[si];
+            }
+            meanR /= samplesR.length;
+            meanG /= samplesG.length;
+            meanB /= samplesB.length;
+            var varR = 0, varG = 0, varB = 0;
+            for (var sj = 0; sj < samplesR.length; sj++) {
+                var dR = samplesR[sj] - meanR;
+                var dG = samplesG[sj] - meanG;
+                var dB = samplesB[sj] - meanB;
+                varR += dR * dR;
+                varG += dG * dG;
+                varB += dB * dB;
+            }
+            varR /= samplesR.length;
+            varG /= samplesG.length;
+            varB /= samplesB.length;
+            var stdDev = Math.sqrt(varR + varG + varB);
+            var confidence = Math.max(0, Math.min(100, Math.round(100 - (stdDev / 2.5))));
+
+            var maxDist = (threshold / 100) * 180;
+            var featherEnd = maxDist * (1 + feather / 100);
+
+            var removedPixels = 0, opaquePixels = 0;
+            for (var i = 0; i < pixels.length; i += 4) {
+                var a = pixels[i + 3];
+                if (a === 0) continue;
+                opaquePixels++;
+
+                var dr = pixels[i] - bgR;
+                var dg = pixels[i + 1] - bgG;
+                var db = pixels[i + 2] - bgB;
+                var dist = Math.sqrt(dr * dr + dg * dg + db * db);
+
+                if (dist <= maxDist) {
+                    pixels[i + 3] = 0;
+                    removedPixels++;
+                } else if (dist < featherEnd) {
+                    var t = (dist - maxDist) / (featherEnd - maxDist);
+                    pixels[i + 3] = Math.round(a * t);
+                }
+            }
+
+            return {
+                confidence: confidence,
+                bgR: bgR,
+                bgG: bgG,
+                bgB: bgB,
+                removedFraction: opaquePixels > 0 ? removedPixels / opaquePixels : 0
+            };
+        }
+
+        function removeBackgroundAccurate(imageData, opts) {
+            var pixels = imageData.data;
+            var w = imageData.width;
+            var h = imageData.height;
+            var threshold = opts.threshold || 20;
+            var feather = opts.feather || 30;
+
+            var edgeWidth = Math.max(1, Math.min(10, Math.floor(w / 4), Math.floor(h / 4)));
+            var samplesR = [], samplesG = [], samplesB = [];
+
+            var x, y, ex, ey, idx;
+            for (x = 0; x < w; x++) {
+                for (ey = 0; ey < edgeWidth; ey++) {
+                    idx = (ey * w + x) * 4;
+                    if (pixels[idx + 3] > 0) { samplesR.push(pixels[idx]); samplesG.push(pixels[idx + 1]); samplesB.push(pixels[idx + 2]); }
+                    idx = ((h - 1 - ey) * w + x) * 4;
+                    if (pixels[idx + 3] > 0) { samplesR.push(pixels[idx]); samplesG.push(pixels[idx + 1]); samplesB.push(pixels[idx + 2]); }
+                }
+            }
+            for (y = edgeWidth; y < h - edgeWidth; y++) {
+                for (ex = 0; ex < edgeWidth; ex++) {
+                    idx = (y * w + ex) * 4;
+                    if (pixels[idx + 3] > 0) { samplesR.push(pixels[idx]); samplesG.push(pixels[idx + 1]); samplesB.push(pixels[idx + 2]); }
+                    idx = (y * w + (w - 1 - ex)) * 4;
+                    if (pixels[idx + 3] > 0) { samplesR.push(pixels[idx]); samplesG.push(pixels[idx + 1]); samplesB.push(pixels[idx + 2]); }
+                }
+            }
+
+            if (samplesR.length === 0) return { confidence: 0 };
+
+            samplesR.sort(function (a, b) { return a - b; });
+            samplesG.sort(function (a, b) { return a - b; });
+            samplesB.sort(function (a, b) { return a - b; });
+            var mid = Math.floor(samplesR.length / 2);
+            var bgR = samplesR[mid], bgG = samplesG[mid], bgB = samplesB[mid];
+
+            var sumR = 0, sumG = 0, sumB = 0;
+            for (var i = 0; i < samplesR.length; i++) {
+                sumR += samplesR[i]; sumG += samplesG[i]; sumB += samplesB[i];
+            }
+            var meanR = sumR / samplesR.length, meanG = sumG / samplesG.length, meanB = sumB / samplesB.length;
+            var varR = 0, varG = 0, varB = 0;
+            for (var j = 0; j < samplesR.length; j++) {
+                var dR = samplesR[j] - meanR, dG = samplesG[j] - meanG, dB = samplesB[j] - meanB;
+                varR += dR * dR; varG += dG * dG; varB += dB * dB;
+            }
+            varR /= samplesR.length; varG /= samplesG.length; varB /= samplesB.length;
+            var stdDev = Math.sqrt(varR + varG + varB);
+            var confidence = Math.max(0, Math.min(100, Math.round(100 - (stdDev / 2.5))));
+
+            var maxDist = (threshold / 100) * 180;
+            var featherEnd = maxDist * (1 + feather / 100);
+            var removedPixels = 0, opaquePixels = 0;
+
+            for (var k = 0; k < pixels.length; k += 4) {
+                var a = pixels[k + 3];
+                if (a === 0) continue;
+                opaquePixels++;
+                var dr = pixels[k] - bgR, dg = pixels[k + 1] - bgG, db = pixels[k + 2] - bgB;
+                var dist = Math.sqrt(dr * dr + dg * dg + db * db);
+                if (dist <= maxDist) {
+                    pixels[k + 3] = 0;
+                    removedPixels++;
+                } else if (dist < featherEnd) {
+                    var t = (dist - maxDist) / (featherEnd - maxDist);
+                    pixels[k + 3] = Math.round(a * t);
+                }
+            }
+
+            return {
+                confidence: confidence,
+                bgR: bgR,
+                bgG: bgG,
+                bgB: bgB,
+                removedFraction: opaquePixels > 0 ? removedPixels / opaquePixels : 0
+            };
+        }
+
         function generateHints(rawAlpha, contrastScore) {
             const hints = [];
             const minOp = parseInt(opacityMinSlider.value);
@@ -1142,6 +1428,30 @@
             const preserveColor = preserveColorCheckbox.checked;
             const invertStrength = parseInt(invertSlider.value) / 100;
 
+            // Apply background removal if enabled
+            var currentAlphaAnalysis = rawAlphaAnalysis;
+            if (bgRemoveMode && bgRemoveMode.value !== 'off') {
+                var modeVal = bgRemoveMode.value;
+                if (modeVal === 'accurate' && !ENABLE_ACCURATE_BG_REMOVE) {
+                    /* Feature flag disabled: fall back to Off (no removal). Badge already set by change handler. */
+                } else {
+                    var threshold = parseInt(bgThreshold.value);
+                    var feather = parseInt(bgFeather.value);
+                    var result;
+                    if (modeVal === 'accurate') {
+                        result = removeBackgroundAccurate(newImageData, { threshold: threshold, feather: feather });
+                    } else {
+                        result = removeBackgroundQuick(newImageData, threshold, feather);
+                    }
+                    if (bgRemoveBadge) {
+                        bgRemoveBadge.style.display = 'inline-flex';
+                        bgRemoveBadge.className = 'bg-remove-badge ' + (result.confidence >= 30 ? 'active' : 'low');
+                        bgRemoveBadge.textContent = (modeVal === 'accurate' ? 'Accurate' : 'Quick') + ' remove active \u00b7 ' + result.confidence + '%';
+                    }
+                    currentAlphaAnalysis = analyzeTransparency(newImageData);
+                }
+            }
+
             for (let i = 0; i < data.length; i += 4) {
                 const r = data[i];
                 const g = data[i + 1];
@@ -1187,9 +1497,9 @@
             // 4. Render to export canvas (clean, no glow)
             exportCtx.putImageData(newImageData, 0, 0);
 
-            if (rawAlphaAnalysis) {
+            if (currentAlphaAnalysis) {
                 var processedContrast = analyzeContrast(newImageData);
-                var hints = generateHints(rawAlphaAnalysis, processedContrast);
+                var hints = generateHints(currentAlphaAnalysis, processedContrast);
                 renderAnalysis(hints);
             }
 
@@ -1224,7 +1534,7 @@
             // Update export confidence box
             if (exportConfidenceBox) {
                 exportConfidenceBox.style.display = 'block';
-                if (confTransparency) confTransparency.textContent = rawAlphaAnalysis && rawAlphaAnalysis.hasTransparency ? 'Yes' : 'No';
+                if (confTransparency) confTransparency.textContent = currentAlphaAnalysis && currentAlphaAnalysis.hasTransparency ? 'Yes' : 'No';
                 if (confDims) confDims.textContent = exportCanvas.width + ' x ' + exportCanvas.height;
                 if (confNote) {
                     let note = 'Custom dimensions';
