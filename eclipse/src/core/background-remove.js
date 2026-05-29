@@ -35,25 +35,21 @@
         return;
       }
       state.accurateRemoveLoading = true;
-      var script = document.createElement('script');
-      script.src = 'https://unpkg.com/@imgly/background-removal@1.7.1/dist/background-removal.iife.js';
-      script.onload = function () {
-        if (typeof imglyRemoveBackground !== 'undefined') {
-          state.accurateRemoveModule = imglyRemoveBackground;
+      import('https://unpkg.com/@imgly/background-removal@1.7.0/dist/index.mjs').then(function (mod) {
+        if (mod && typeof mod.removeBackground === 'function') {
+          state.accurateRemoveModule = mod.removeBackground;
           state.accurateRemoveLoading = false;
           resolve(state.accurateRemoveModule);
         } else {
           state.accurateRemoveLoading = false;
-          state.accurateRemoveError = 'Module loaded but function not found';
+          state.accurateRemoveError = 'Accurate remover module missing removeBackground export';
           reject(new Error(state.accurateRemoveError));
         }
-      };
-      script.onerror = function () {
+      }).catch(function () {
         state.accurateRemoveLoading = false;
-        state.accurateRemoveError = 'Failed to load script from CDN';
+        state.accurateRemoveError = 'Failed to load accurate remover from CDN';
         reject(new Error(state.accurateRemoveError));
-      };
-      document.head.appendChild(script);
+      });
     });
   };
 
@@ -167,7 +163,7 @@
       var config = {
         model: 'medium',
         output: {
-          type: 'image/png',
+          format: 'image/png',
           quality: 1
         }
       };
