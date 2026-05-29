@@ -67,23 +67,181 @@
             overflow-y: auto;
         }
 
-        .controls {
+        .step-section {
             padding: 20px;
             background: var(--card-bg);
             border-radius: 12px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .step-section h2 {
+            margin: 0 0 14px 0;
+            font-size: 1.1em;
+            color: var(--accent-color);
+        }
+
+        .step-row {
             display: flex;
             gap: 20px;
             align-items: center;
             flex-wrap: wrap;
         }
 
-        input[type="file"] {
-            padding: 10px;
-            background: #333;
-            border-radius: 4px;
-            color: white;
+        /* Upload zone */
+        .upload-zone {
+            position: relative;
+            border: 2px dashed #555;
+            border-radius: 12px;
+            padding: 28px;
+            text-align: center;
             cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.drag-over,
+        .upload-zone:focus-within {
+            border-color: var(--accent-color);
+            background: rgba(187, 134, 252, 0.05);
+        }
+
+        .upload-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        .upload-prompt {
+            pointer-events: none;
+            color: #aaa;
+            font-size: 0.95em;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Status chips */
+        .status-chips {
+            display: none;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .status-chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            background: #333;
+            color: #ccc;
+            border: 1px solid #444;
+        }
+
+        .status-chip.ok {
+            background: rgba(76, 175, 80, 0.15);
+            border-color: #4caf50;
+            color: #81c784;
+        }
+
+        .status-chip.warn {
+            background: rgba(255, 193, 7, 0.15);
+            border-color: #ffc107;
+            color: #ffcc80;
+        }
+
+        /* Destination cards */
+        .destination-cards {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .dest-card {
+            flex: 1;
+            min-width: 120px;
+            padding: 16px;
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 10px;
+            color: #ccc;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .dest-card:hover:not(.active) {
+            border-color: #777;
+            color: #ddd;
+        }
+
+        .dest-card.active {
+            background: var(--accent-color);
+            color: #000;
+            border-color: var(--accent-color);
+        }
+
+        .dest-card-title {
+            font-weight: 700;
+            font-size: 0.95em;
+            margin-bottom: 4px;
+        }
+
+        .dest-card-dims {
+            font-size: 0.8em;
+            opacity: 0.8;
+        }
+
+        /* Export confidence */
+        .export-confidence {
+            margin-bottom: 14px;
+            padding: 14px;
+            background: #2a2a2a;
+            border-radius: 8px;
+            border: 1px solid #444;
+        }
+
+        .confidence-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #444;
+            font-size: 0.9em;
+        }
+
+        .confidence-row:last-child {
+            border-bottom: none;
+        }
+
+        .confidence-label {
+            color: #aaa;
+        }
+
+        .confidence-value {
+            color: #eee;
+            font-weight: 600;
+        }
+
+        .confidence-note {
+            margin-top: 10px;
+            font-size: 0.85em;
+            color: #888;
+            font-style: italic;
+        }
+
+        /* Accessibility helpers */
+        .sr-only {
+            position: absolute;
+            left: -10000px;
+            width: 1px;
+            height: 1px;
+            overflow: hidden;
         }
 
         button {
@@ -99,6 +257,11 @@
 
         button:hover {
             opacity: 0.9;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .crop-container {
@@ -363,6 +526,16 @@
             border: 1px solid #555;
         }
 
+        /* Focus visible for all interactive controls */
+        button:focus-visible,
+        select:focus-visible,
+        input:focus-visible,
+        summary:focus-visible,
+        .dest-card:focus-visible {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 900px) {
             .container {
@@ -385,32 +558,62 @@
     <div class="container">
         <!-- Left Column: Input & Crop -->
         <div class="input-column">
-            <div class="controls">
-                <div class="slider-group">
-                    <label for="upload">Upload Image</label>
-                    <input type="file" id="upload" accept="image/*">
+
+            <!-- Step 1: Upload -->
+            <section class="step-section" aria-labelledby="step1-heading">
+                <h2 id="step1-heading">Step 1: Upload</h2>
+                <div class="upload-zone" id="upload-zone">
+                    <input type="file" id="upload" accept="image/*" aria-label="Upload image file">
+                    <div class="upload-prompt">
+                        <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
+                            stroke-width="2" aria-hidden="true">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <span>Drag &amp; drop an image here, or click to browse</span>
+                    </div>
                 </div>
-                <div class="slider-group">
-                    <label for="output-size">Output Size / Crop Ratio</label>
-                    <select id="output-size" style="padding: 5px; background: #333; color: white; border-radius: 4px;">
-                        <option value="original">Free / Original</option>
-                        <option value="header">Twitter Header (1500x500)</option>
-                        <option value="pfp">Twitter Profile (400x400)</option>
-                    </select>
+                <div class="status-chips" id="status-chips" aria-live="polite" aria-atomic="true"></div>
+            </section>
+
+            <!-- Step 2: Destination -->
+            <section class="step-section" aria-labelledby="step2-heading">
+                <h2 id="step2-heading">Step 2: Destination</h2>
+                <div class="destination-cards" role="radiogroup" aria-label="Select destination">
+                    <button class="dest-card active" type="button" data-value="pfp" role="radio"
+                        aria-checked="true">
+                        <div class="dest-card-title">X Profile</div>
+                        <div class="dest-card-dims">400 x 400</div>
+                    </button>
+                    <button class="dest-card" type="button" data-value="header" role="radio" aria-checked="false">
+                        <div class="dest-card-title">X Header</div>
+                        <div class="dest-card-dims">1500 x 500</div>
+                    </button>
+                    <button class="dest-card" type="button" data-value="original" role="radio" aria-checked="false">
+                        <div class="dest-card-title">Custom</div>
+                        <div class="dest-card-dims">Free ratio</div>
+                    </button>
                 </div>
-                <div class="slider-group">
-                    <label for="preset">Style Preset</label>
-                    <select id="preset" class="preset-select">
-                        <option value="custom">Custom</option>
-                        <option value="balanced">Balanced</option>
-                        <option value="bold-dark">Bold on Dark</option>
-                        <option value="soft-ghost">Soft Ghost</option>
-                        <option value="high-contrast">High Contrast</option>
-                        <option value="preserve-color">Preserve Color</option>
-                    </select>
+            </section>
+
+            <!-- Step 3: Style -->
+            <section class="step-section" aria-labelledby="step3-heading">
+                <h2 id="step3-heading">Step 3: Style</h2>
+                <div class="step-row">
+                    <div class="slider-group">
+                        <label for="preset">Style Preset</label>
+                        <select id="preset" class="preset-select">
+                            <option value="custom">Custom</option>
+                            <option value="balanced">Balanced</option>
+                            <option value="bold-dark">Bold on Dark</option>
+                            <option value="soft-ghost">Soft Ghost</option>
+                            <option value="high-contrast">High Contrast</option>
+                            <option value="preserve-color">Preserve Color</option>
+                        </select>
+                    </div>
+                    <button id="process-btn">Process Image</button>
                 </div>
-                <button id="process-btn">Process Image</button>
-                <button id="download-btn" disabled>Download PNG</button>
 
                 <details class="advanced-section">
                     <summary>Advanced Settings</summary>
@@ -433,7 +636,8 @@
                             </label>
                         </div>
                         <div class="slider-group">
-                            <label for="glow-strength">Magic Glow (Dark Mode) <span id="val-glow">0</span></label>
+                            <label for="glow-strength">Magic Glow (Dark Mode) <span
+                                    id="val-glow">0</span></label>
                             <input type="range" id="glow-strength" min="0" max="50" value="0">
                         </div>
                         <div class="slider-group">
@@ -442,13 +646,35 @@
                         </div>
                     </div>
                 </details>
-            </div>
+            </section>
+
+            <!-- Step 4: Export -->
+            <section class="step-section" aria-labelledby="step4-heading">
+                <h2 id="step4-heading">Step 4: Export</h2>
+                <div class="export-confidence" id="export-confidence" style="display: none;">
+                    <div class="confidence-row">
+                        <span class="confidence-label">Transparency preserved</span>
+                        <span class="confidence-value" id="conf-transparency">—</span>
+                    </div>
+                    <div class="confidence-row">
+                        <span class="confidence-label">Output dimensions</span>
+                        <span class="confidence-value" id="conf-dims">—</span>
+                    </div>
+                    <div class="confidence-row">
+                        <span class="confidence-label">Format</span>
+                        <span class="confidence-value">PNG</span>
+                    </div>
+                    <div class="confidence-note" id="conf-note"></div>
+                </div>
+                <button id="download-btn" disabled>Download PNG</button>
+            </section>
 
             <!-- Validation / Analysis Box -->
             <div class="validation-box" id="validation-box" style="display: none;">
-                <h4 style="margin: 0 0 10px 0; color: var(--accent-color);">Image Analysis</h4>
+                <h3 style="margin: 0 0 10px 0; color: var(--accent-color);">Image Analysis</h3>
                 <div id="validation-items"></div>
             </div>
+            <div class="sr-only" id="analysis-live" aria-live="polite" aria-atomic="true"></div>
 
             <!-- Crop Area -->
             <div class="crop-container" id="crop-container">
@@ -508,7 +734,6 @@
         const uploadInput = document.getElementById('upload');
         const processBtn = document.getElementById('process-btn');
         const downloadBtn = document.getElementById('download-btn');
-        const outputSizeSelect = document.getElementById('output-size');
         const opacityMinSlider = document.getElementById('opacity-min');
         const opacityMaxSlider = document.getElementById('opacity-max');
         const contrastSlider = document.getElementById('contrast');
@@ -539,20 +764,32 @@
         const exportCanvas = document.createElement('canvas');
         const exportCtx = exportCanvas.getContext('2d');
 
+        // New redesign elements
+        const destCards = document.querySelectorAll('.dest-card');
+        const uploadZone = document.getElementById('upload-zone');
+        const statusChips = document.getElementById('status-chips');
+        const exportConfidenceBox = document.getElementById('export-confidence');
+        const confTransparency = document.getElementById('conf-transparency');
+        const confDims = document.getElementById('conf-dims');
+        const confNote = document.getElementById('conf-note');
+        const analysisLive = document.getElementById('analysis-live');
+
         let cropper = null;
         let cachedImageData = null;
         let rawAlphaAnalysis = null;
+        let currentDestination = 'pfp';
+        let lastUploadedFile = null;
 
         // Auto-process on slider change if image exists (and is processed)
         // Optimization: We cache the cropped data so we don't re-crop on every slider move.
         const triggerProcess = () => { if (cropper) processImage(); };
 
         const presets = {
-            'balanced':       { min: 20, max: 100, contrast: 1.0, preserve: false, glow: 0,  invert: 0 },
-            'bold-dark':      { min: 30, max: 100, contrast: 1.5, preserve: false, glow: 15, invert: 0 },
-            'soft-ghost':     { min: 5,  max: 60,  contrast: 0.8, preserve: false, glow: 5,  invert: 0 },
-            'high-contrast':  { min: 10, max: 100, contrast: 2.0, preserve: false, glow: 20, invert: 0 },
-            'preserve-color': { min: 20, max: 100, contrast: 1.0, preserve: true,  glow: 10, invert: 0 }
+            'balanced': { min: 20, max: 100, contrast: 1.0, preserve: false, glow: 0, invert: 0 },
+            'bold-dark': { min: 30, max: 100, contrast: 1.5, preserve: false, glow: 15, invert: 0 },
+            'soft-ghost': { min: 5, max: 60, contrast: 0.8, preserve: false, glow: 5, invert: 0 },
+            'high-contrast': { min: 10, max: 100, contrast: 2.0, preserve: false, glow: 20, invert: 0 },
+            'preserve-color': { min: 20, max: 100, contrast: 1.0, preserve: true, glow: 10, invert: 0 }
         };
 
         function applyPreset(key) {
@@ -592,25 +829,104 @@
 
         preserveColorCheckbox.addEventListener('change', () => { markCustom(); triggerProcess(); });
 
-        // Update Cropper Aspect Ratio when selection changes
-        outputSizeSelect.addEventListener('change', () => {
+        // Destination cards logic
+        function setDestinationValue(value) {
+            currentDestination = value;
+            destCards.forEach(card => {
+                const isActive = card.getAttribute('data-value') === value;
+                card.classList.toggle('active', isActive);
+                card.setAttribute('aria-checked', isActive ? 'true' : 'false');
+            });
+
             if (!cropper) return;
 
-            const sizeMode = outputSizeSelect.value;
-            if (sizeMode === 'header') {
-                cropper.setAspectRatio(1500 / 500);
-            } else if (sizeMode === 'pfp') {
-                cropper.setAspectRatio(1); // 1:1
-            } else {
-                cropper.setAspectRatio(NaN); // Free
+            let ar;
+            if (value === 'header') ar = 1500 / 500;
+            else if (value === 'pfp') ar = 1;
+            else ar = NaN;
+            cropper.setAspectRatio(ar);
+            updateCroppedData();
+
+            // Sync preview mock toggle
+            if (value === 'pfp') setDestination('profile');
+            else if (value === 'header') setDestination('header');
+        }
+
+        destCards.forEach(card => {
+            card.addEventListener('click', () => {
+                setDestinationValue(card.getAttribute('data-value'));
+            });
+        });
+
+        // Upload zone drag & drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+            }, false);
+        });
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.add('drag-over');
+            }, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            uploadZone.addEventListener(eventName, () => {
+                uploadZone.classList.remove('drag-over');
+            }, false);
+        });
+
+        uploadZone.addEventListener('drop', (e) => {
+            const dt = e.dataTransfer;
+            const files = dt.files;
+            if (files && files.length) {
+                uploadInput.files = files;
+                uploadInput.dispatchEvent(new Event('change'));
             }
         });
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes < 1024) return bytes + ' B';
+            if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+            return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+        }
+
+        function renderStatusChips(file, hasTransparency) {
+            if (!statusChips) return;
+            statusChips.style.display = 'flex';
+            let html = '';
+            const name = file.name || 'Image';
+            html += '<span class="status-chip">' + escapeHtml(name) + '</span>';
+            const ext = name.split('.').pop().toUpperCase();
+            html += '<span class="status-chip">' + escapeHtml(ext || 'Image') + '</span>';
+            const size = formatFileSize(file.size);
+            const sizeClass = file.size > 5 * 1024 * 1024 ? 'warn' : '';
+            html += '<span class="status-chip ' + sizeClass + '">' + escapeHtml(size) + '</span>';
+            if (typeof hasTransparency === 'boolean') {
+                const cls = hasTransparency ? 'ok' : 'warn';
+                const text = hasTransparency ? 'Transparency detected' : 'No transparency';
+                html += '<span class="status-chip ' + cls + '">' + text + '</span>';
+            }
+            statusChips.innerHTML = html;
+        }
 
         uploadInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
+            lastUploadedFile = file;
             rawAlphaAnalysis = null;
             validationBox.style.display = 'none';
+            if (analysisLive) analysisLive.textContent = '';
+            if (statusChips) statusChips.style.display = 'none';
+            if (exportConfidenceBox) exportConfidenceBox.style.display = 'none';
 
             const reader = new FileReader();
             reader.onload = (event) => {
@@ -627,15 +943,15 @@
                     autoCropArea: 1, // Start with full image selected
                     responsive: true,
                     ready() {
+                        // Set initial aspect ratio based on current destination
+                        let ar = currentDestination === 'header' ? 1500 / 500 : currentDestination === 'pfp' ? 1 : NaN;
+                        cropper.setAspectRatio(ar);
                         updateCroppedData(); // Initial process
                     },
                     cropend() {
                         updateCroppedData(); // Update cache on crop end
                     }
                 });
-
-                // Trigger aspect ratio set based on current dropdown
-                outputSizeSelect.dispatchEvent(new Event('change'));
             };
             reader.readAsDataURL(file);
         });
@@ -754,6 +1070,7 @@
         function renderAnalysis(hints) {
             if (!hints || hints.length === 0) {
                 validationBox.style.display = 'none';
+                if (analysisLive) analysisLive.textContent = '';
                 return;
             }
 
@@ -768,13 +1085,17 @@
 
             validationItems.innerHTML = html;
             validationBox.style.display = 'block';
+
+            if (analysisLive) {
+                analysisLive.textContent = hints.map(function (h) { return h.text; }).join('. ');
+            }
         }
 
         function updateCroppedData() {
             if (!cropper) return;
 
             // Get cropped canvas
-            const sizeMode = outputSizeSelect.value;
+            const sizeMode = currentDestination;
             let options = {};
 
             if (sizeMode === 'header') {
@@ -800,6 +1121,10 @@
             const ctx = croppedCanvas.getContext('2d');
             cachedImageData = ctx.getImageData(0, 0, croppedCanvas.width, croppedCanvas.height);
             rawAlphaAnalysis = analyzeTransparency(cachedImageData);
+
+            if (lastUploadedFile) {
+                renderStatusChips(lastUploadedFile, rawAlphaAnalysis.hasTransparency);
+            }
 
             processImage();
         }
@@ -895,6 +1220,19 @@
             }
 
             downloadBtn.disabled = false;
+
+            // Update export confidence box
+            if (exportConfidenceBox) {
+                exportConfidenceBox.style.display = 'block';
+                if (confTransparency) confTransparency.textContent = rawAlphaAnalysis && rawAlphaAnalysis.hasTransparency ? 'Yes' : 'No';
+                if (confDims) confDims.textContent = exportCanvas.width + ' x ' + exportCanvas.height;
+                if (confNote) {
+                    let note = 'Custom dimensions';
+                    if (currentDestination === 'pfp') note = 'Optimized for X Profile (400x400)';
+                    else if (currentDestination === 'header') note = 'Optimized for X Header (1500x500)';
+                    confNote.textContent = note;
+                }
+            }
         }
 
         // Preview mode controls
@@ -902,21 +1240,21 @@
         const previewCards = document.querySelectorAll('.preview-card');
 
         function setPreviewMode(mode) {
-            modeBtns.forEach(function(btn) {
+            modeBtns.forEach(function (btn) {
                 btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
             });
             if (mode === 'compare') {
-                previewCards.forEach(function(card) { card.style.display = ''; });
+                previewCards.forEach(function (card) { card.style.display = ''; });
             } else {
-                previewCards.forEach(function(card) {
+                previewCards.forEach(function (card) {
                     var isMatch = card.classList.contains(mode + '-mode');
                     card.style.display = isMatch ? '' : 'none';
                 });
             }
         }
 
-        modeBtns.forEach(function(btn) {
-            btn.addEventListener('click', function() {
+        modeBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
                 setPreviewMode(btn.getAttribute('data-mode'));
             });
         });
@@ -925,14 +1263,14 @@
         const destBtns = document.querySelectorAll('.dest-btn');
         const previewCardHeadings = document.querySelectorAll('.preview-card h4');
         const originalHeadings = [];
-        previewCardHeadings.forEach(function(h) { originalHeadings.push(h.textContent); });
+        previewCardHeadings.forEach(function (h) { originalHeadings.push(h.textContent); });
 
         function setDestination(dest) {
-            destBtns.forEach(function(btn) {
+            destBtns.forEach(function (btn) {
                 btn.classList.toggle('active', btn.getAttribute('data-dest') === dest);
             });
             var label = dest === 'profile' ? 'Profile' : 'Header';
-            previewCards.forEach(function(card, i) {
+            previewCards.forEach(function (card, i) {
                 card.classList.remove('dest-profile', 'dest-header');
                 card.classList.add('dest-' + dest);
                 var base = originalHeadings[i];
@@ -940,15 +1278,18 @@
             });
         }
 
-        destBtns.forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                setDestination(btn.getAttribute('data-dest'));
+        destBtns.forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const dest = btn.getAttribute('data-dest');
+                setDestination(dest);
+                if (dest === 'profile') setDestinationValue('pfp');
+                else if (dest === 'header') setDestinationValue('header');
             });
         });
 
         setDestination('profile');
     </script>
- 
+
 </body>
 
 </html>
