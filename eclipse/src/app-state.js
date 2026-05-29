@@ -13,7 +13,7 @@
     accurateRemoveLoading: false,
     accurateRemoveError: null,
 
-    ENABLE_ACCURATE_BG_REMOVE: false,
+    ENABLE_ACCURATE_BG_REMOVE: true,
 
     timingEnabled: false,
 
